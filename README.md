@@ -35,9 +35,8 @@ This package is implements the method described in the paper:
 ## Installation
 
 ### Install from PyPI
-```bash
-pip install froth_gnn
-```
+
+*Coming soon.*
 
 ### Install from source:
 
