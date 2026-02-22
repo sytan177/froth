@@ -72,7 +72,7 @@ See [`examples/getting_started.ipynb`](examples/getting_started.ipynb) for a tut
 from froth import SnapData, ImageData, SnapConfig, ImageConfig, BubbleClassifier, BubbleExtractor
 
 # simulation snapshot
-snap = SnapData(539, config_file='config.yaml')
+snap = SnapData(snapshot_data, config_file='config.yaml')
 classifier = BubbleClassifier(model_name='aerate_3d')
 classifier.aerate_snapshot(snap)
 
