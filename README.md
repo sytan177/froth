@@ -66,7 +66,7 @@ pip install -e .
 ## Quick Start
 
 
-See [`examples/getting_started.ipynb`](examples/getting_started.ipynb) for a tutorial.
+See [`examples/getting_started.ipynb`](examples/getting_started.ipynb) for a practical walkthrough covering simulation snapshots and observational images.
 
 ```python
 from froth import SnapData, ImageData, SnapConfig, ImageConfig, BubbleClassifier, BubbleExtractor
