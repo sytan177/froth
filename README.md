@@ -81,7 +81,7 @@ extractor.knock_snapshot()
 
 # observational image
 image = ImageData('path_to_file.fits')
-classifier = BubbleClassifier('aerate_2d_den')
+classifier = BubbleClassifier(model_name='aerate_2d_den')
 classifier.aerate_image(image)
 extractor = BubbleExtractor(image)
 extractor.knock_image()
