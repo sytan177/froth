@@ -86,4 +86,6 @@ classifier.aerate_image(image)
 extractor = BubbleExtractor(image)
 extractor.knock_image()
 ```
+## Contributing
 
+We welcome bug fixes and new features. The 2D projected maps function is still in development. Simply fork the repository and send us a pull request with your changes. Tests would be much appreciated.
