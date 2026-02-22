@@ -1,0 +1,37 @@
+base_config: aerate_base.yaml
+
+model_class: GCN_inner
+checkpoint: froth_aerate_2d_v.1.0.pth
+ 
+architecture:
+  in_channels: 2
+  hidden_layers: 64
+  out_channels: 2
+  dropout: 0.2
+  heads: 8
+  
+input_features:
+  - temperature
+  - density
+ 
+training:
+  optimizer:
+    lr: 0.001
+    
+  loss:
+    label_smoothing: 0.05
+
+  epochs: 100
+  batch_size: 1 
+
+metadata:
+  variant: "2d projected maps"
+  version: "1.0"
+  training_date: "2025-2-22"
+  dataset: "snap_150 projected density and temperature maps"
+  description: "GNN model with GraphConv + GATv2, den & tem-aware"
+  recommended: true
+  tags: [2d, density, temperature]
+  
+  notes: |
+    First version of 2D classifier.

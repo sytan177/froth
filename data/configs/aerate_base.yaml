@@ -1,0 +1,40 @@
+model_class: GCN_inner
+ 
+architecture:
+  in_channels: 2    
+  hidden_layers: 64
+  out_channels: 2
+  dropout: 0.2
+  heads: 8
+  concat: false 
+ 
+training:
+  optimizer:
+    type: Adam
+    lr: 0.001
+    weight_decay: 0.001
+    
+  loss:
+    type: CrossEntropyLoss
+    weight: class_weights
+    reduction: none
+    label_smoothing: 0.1
+    
+  class_weighting:
+    enabled: true
+    
+  epochs: 100
+  batch_size: 1 
+    
+preprocessing:
+  normalize: true
+  log_density: true
+  
+metadata:
+  model_type: gnn
+  framework: pytorch_geometric
+  torch_version: 2.7.0+cu126
+  cuda_available: false
+  cuda_version: 12.6
+  cudnn_version: 9.5.1
+  device: cpu

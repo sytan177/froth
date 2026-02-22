@@ -1,0 +1,36 @@
+base_config: aerate_base.yaml
+
+model_class: GCN_inner_2D
+checkpoint: /home/atuin/a104bc/a104bc20/gcn_res/models/froth_aerate_2D_SH0.1_LS0.05_v.1.0.pth
+ 
+architecture:
+  in_channels: 1   
+  hidden_layers: 64
+  out_channels: 2
+  dropout: 0.2
+  heads: 8
+  
+input_features:
+  - column density
+ 
+training:
+  optimizer:
+    lr: 0.001
+    
+  loss:
+    label_smoothing: 0.05
+
+  epochs: 100
+  batch_size: 1 
+
+metadata:
+  variant: "col.den."
+  version: "1.0"
+  training_date: "2022-2-22"
+  dataset: "snap_150 projected column density"
+  description: "GNN model with GraphConv + GATv2, col.den.-aware"
+  recommended: true
+  tags: [2d, intensity, column density]
+  
+  notes: |
+    First version of 2D classifier.

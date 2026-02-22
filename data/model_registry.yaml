@@ -1,0 +1,25 @@
+models:
+  aerate_3d:
+    config: aerate_3d.yaml
+    description: "3d model, ρ and T aware"
+    training_date: "2026-02-13"
+    
+  aerate_3d_den:
+    config: aerate_3d_den_only.yaml
+    description: "3d model, ρ aware"
+    training_date: "2026-02-13"
+    
+  aerate_3d_hot:
+    config: aerate_3d_hot.yaml
+    description: "3d model, ρ and T aware, hard negatives"
+    training_date: "2026-02-13"
+    
+  aerate_2d:
+    config: aerate_2d.yaml
+    description: "2d model, projected ρ and T aware"
+    training_date: "2026-2-22"
+    
+  aerate_2d_den:
+    config: aerate_2d_den.yaml
+    description: "2d model, col. den. aware"
+    training_date: "2026-2-22"

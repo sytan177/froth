@@ -1,0 +1,40 @@
+base_config: aerate_base.yaml
+
+checkpoint: froth_aerate_3d_den_v.1.0.pth
+
+architecture:
+  in_channels: 1   
+  
+input_features:
+  - density
+
+training:
+  final_train_loss: 0.4448
+  final_val_loss: 0.4467
+  
+  loss_history:
+    epoch_10: {train: 0.5195, val: 0.5600}
+    epoch_20: {train: 0.4837, val: 0.5096}
+    epoch_30: {train: 0.4706, val: 0.4867}
+    epoch_40: {train: 0.4637, val: 0.4756}
+    epoch_50: {train: 0.4593, val: 0.4672}
+    epoch_60: {train: 0.4556, val: 0.4603}
+    epoch_70: {train: 0.4522, val: 0.4554}
+    epoch_80: {train: 0.4497, val: 0.4518}
+    epoch_90: {train: 0.4469, val: 0.4489}
+    epoch_100: {train: 0.4448, val: 0.4467}
+
+  compute_time:
+    cpu_time: "user 4h 5min 34s, sys: 27min 36s, total: 4h 33min 10s"
+    wall_time: "23min 29s"
+
+metadata:
+  version: "1.0"
+  training_date: "2025-02-13 15:40"
+  dataset: "snap_150"
+  description: "GNN model with GraphConv + GATv2, tem-aware"
+  recommended: true
+  tags: [3d, density, temperature]
+  
+  notes: |
+    First version of low-density and high-temperature region classifier.

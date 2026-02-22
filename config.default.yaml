@@ -1,0 +1,6 @@
+# config.default.yaml
+paths:
+  snap_path: /path/to/your/data  # UPDATE THIS
+  vor_path: null 
+  scaler_path: null
+  bubble_res_path: null
