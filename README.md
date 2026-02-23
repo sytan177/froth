@@ -13,7 +13,7 @@
 
 Identify supernova-driven bubbles or general underdense regions in simulation snapshots or galaxy images using trained graph neural networks. The models can take either gas data or image intensity as input features. Currently validated on high-resolution Arepo galaxy simulations with spatial resolutions of 10, 30, and 100 pc, as well as JWST galaxy images in the F770W and F1130W bands.
 
-This package is implements the method described in the paper:
+This package implements the method described in the paper:
 
 *Coming soon.*
 
