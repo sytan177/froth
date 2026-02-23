@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/images/froth.png" alt="Froth Logo" width="200"/>
+  <img src="asserts/froth.png" alt="Froth Logo" width="200"/>
 </p>
 
 # froth: Superbubble Identification with Graph Neural Networks
