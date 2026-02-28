@@ -152,6 +152,7 @@ class BubbleMergeConfig:
     max_group_size: int = 1_000_000
     min_component_size: int = 5
     component_iteration_size_factor: int = 0
+    enforce_terminal_bijection: bool = False
     chunk_size: int = 1_000_000
     n_jobs: int = -1
 
@@ -549,7 +550,7 @@ class InnerBubbleGroups:
     @staticmethod
     def _should_merge_group(group_num, indices, indptr, assigned, grouped_mask, boundary_mask, 
                            invalid_component_ids, max_group_size, threshold):
-        invalid_groups = invalid_component_ids or []
+        invalid_groups = invalid_component_ids
         group_nodes = np.flatnonzero(assigned == group_num)
         if len(group_nodes) == 0 or len(group_nodes) > max_group_size:
             return None
@@ -582,13 +583,17 @@ class InnerBubbleGroups:
         if len(group_skip) > 0:
             groups_to_process = [g for g in groups_to_process if g not in group_skip]
         logger.info(f"   ·   {len(groups_to_process)} candidate groups ...")
+        if self.config.enforce_terminal_bijection:
+            invalid_component_ids = self.invalid_component_ids
+        else:
+            invalid_component_ids = []
         
         # Batch merge groups in parallel
         merge_decisions = Parallel(n_jobs=self.config.n_jobs, prefer="threads")(
             delayed(InnerBubbleGroups._should_merge_group)(group_num, self.adj.indices, 
                                                                self.adj.indptr, self.assigned,
                                                                self.grouped_mask, self.boundary_mask, 
-                                                               self.invalid_component_ids, self.config.max_group_size, 
+                                                               invalid_component_ids, self.config.max_group_size, 
                                                                self.config.threshold)for group_num in groups_to_process)
         new_assigned = self.assigned.copy()
         new_skip = []
