@@ -47,6 +47,8 @@ class BubbleExtractor:
             - component_iteration_size_factor : int, default=0 (default: 5)
               Minimum component size increases with iterations: size_limit = min_component_size + factor * iteration.
               Set > 0 to progressively filter out small components during peeling.
+            - single_connect (int): Min neighbors required when all neighbors belong to the same group
+            - connect (int): Min neighbors required when neighbors belong to multiple different groups
             - chunk_size (int): Batch size for parallelization (default: 10000000)
             - n_jobs (int): Number of parallel jobs, -1 for all cores (default: -1)
         shell_params : dict, optional
@@ -153,6 +155,8 @@ class BubbleMergeConfig:
     min_component_size: int = 5
     component_iteration_size_factor: int = 0
     enforce_terminal_bijection: bool = False
+    single_connect: int = 3
+    connect: int = 4
     chunk_size: int = 1_000_000
     n_jobs: int = -1
 
@@ -165,15 +169,15 @@ class InnerBubbleGroups:
             self._get_size = lambda: data.num_particles
             self._get_cfd = lambda: data.confidence
             self._get_lineage = self.get_component_lineage
-            self._single_connect = 3
-            self._connect = 4
+            #self._single_connect = 3
+            #self._connect = 4
         elif isinstance(self._data, ImageData):
             self._get_vor = lambda: data.neighbors_all
             self._get_size = lambda: data.num_pixels
             self._get_cfd = lambda: data.probs
             self._get_lineage = self.get_image_component_lineage
-            self._single_connect = 1
-            self._connect = 1
+            #self._single_connect = 1
+            #self._connect = 1
         else:
             raise TypeError(f"Unsupported data type: {type(data)}")
             
@@ -457,8 +461,8 @@ class InnerBubbleGroups:
             valid_mask[grouped] = mask_lookup[assigned[grouped]]
             num_batches = ceil(len(unassigned) / chunk_size)
             uni_groups = [unassigned[i*chunk_size : (i+1)*chunk_size] for i in range(num_batches)]
-            single_connect = self._single_connect
-            connect = self._connect
+            single_connect = self.config.single_connect
+            connect = self.config.connect
             # Assign nodes to components in parallel batches
             results = Parallel(n_jobs=self.config.n_jobs, prefer="threads")(
                 delayed(InnerBubbleGroups._assign_batch)(
