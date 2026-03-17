@@ -169,15 +169,11 @@ class InnerBubbleGroups:
             self._get_size = lambda: data.num_particles
             self._get_cfd = lambda: data.confidence
             self._get_lineage = self.get_component_lineage
-            #self._single_connect = 3
-            #self._connect = 4
         elif isinstance(self._data, ImageData):
             self._get_vor = lambda: data.neighbors_all
             self._get_size = lambda: data.num_pixels
             self._get_cfd = lambda: data.probs
             self._get_lineage = self.get_image_component_lineage
-            #self._single_connect = 1
-            #self._connect = 1
         else:
             raise TypeError(f"Unsupported data type: {type(data)}")
             
@@ -430,7 +426,7 @@ class InnerBubbleGroups:
             for nb in neighbors:
                 if valid_mask[nb]:
                     valid_neighbors += 1
-            if valid_neighbors < 3:
+            if valid_neighbors < single_connect:
                 continue
                 
             counts = np.zeros(max_g + 1, dtype=np.int32)
