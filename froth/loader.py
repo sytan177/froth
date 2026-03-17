@@ -114,7 +114,8 @@ class SnapData:
     @property
     def vor_files(self):
         if not self._file_config._validate_vor_files(self._vor_files) or self.rebuild_voronoi:
-            logger.info("Voronoi files missing or rebuild requested./n ░░░░░░░░░░░░░░ computing Voronoi... ░░░░░░░░░░░░░░")
+            logger.info("Voronoi files missing or rebuild requested.")
+            logger.info("░░░░░░░░░░░░░░ computing Voronoi... ░░░░░░░░░░░░░░")
             self.compute_voronoi()
             self._vor_files = self._file_config.vor_file(snap_num)
         return self._vor_files
