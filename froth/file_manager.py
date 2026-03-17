@@ -73,7 +73,7 @@ class FileManager:
     
     def _validate_vor_files(self, file_paths):
         if not file_paths:
-            raise False
+            return False
 
         pattern = r"\d+_\d+_([\d.\-]+)_([\d.\-]+)_sec_vor\.npz"
         phi_ranges = []
