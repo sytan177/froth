@@ -117,7 +117,7 @@ class SnapData:
             logger.info("Voronoi files missing or rebuild requested.")
             logger.info("░░░░░░░░░░░░░░ computing Voronoi... ░░░░░░░░░░░░░░")
             self.compute_voronoi()
-            self._vor_files = self._file_config.vor_file(snap_num)
+            self._vor_files = self._file_config.vor_file(self.snap_num)
         return self._vor_files
     
     @property
