@@ -22,6 +22,7 @@ class BuildVoronoi:
         self.num_of_chunks = max(1, 2 ** int(np.round(np.log2(self.snap.num_particles / 5_000_000))))
         self.phi_mod = (self.phi + np.pi) % (2 * np.pi)
         self.phi_ranges = np.linspace(0, 2*np.pi, self.num_of_chunks + 1) 
+        self.file_phi_ranges = np.linspace(-np.pi, np.pi, self.num_of_chunks + 1) 
         
     def _configure_parallel(self, n_jobs, num_particles):
         import psutil
@@ -85,10 +86,10 @@ class BuildVoronoi:
         return ridge_pairs
     
     @staticmethod
-    def process_one(i, gas_ids_to_use, gas_ids_filtered, gas_pos_filtered, phi_ranges, snap_num, 
+    def process_one(i, gas_ids_to_use, gas_ids_filtered, gas_pos_filtered, file_phi_ranges, snap_num, 
                     vor_save_path, replace = False):
-        phi_start_i = phi_ranges[i]
-        phi_end_i = phi_ranges[i+1]
+        phi_start_i = file_phi_ranges[i]
+        phi_end_i = file_phi_ranges[i+1]
         vor_save_name = f"{snap_num}_{i}_{np.round(phi_start_i / np.pi, 2)}_{np.round(phi_end_i / np.pi, 2)}_sec_vor.npz"
         save_path = os.path.join(vor_save_path, vor_save_name)
         if not replace:
@@ -107,8 +108,8 @@ class BuildVoronoi:
             print(f'Building Voronoi diagram: {self.num_of_chunks} chunks, ' f'{len(self.id):,} particles')
         t_start = time.time()
         gas_tasks = self.get_tasks()
-        Parallel(n_jobs = self.n_jobs)(delayed(BuildVoronoi.process_one)(i, *gas_tasks[i], self.phi_ranges, self.snap.snap_num, 
-                                                  self.vor_path, ) for i in range(len(gas_tasks)))
+        Parallel(n_jobs = self.n_jobs)(delayed(BuildVoronoi.process_one)(i, *gas_tasks[i], self.file_phi_ranges, self.snap.snap_num, 
+                                                  self.vor_path) for i in range(len(gas_tasks)))
         if self.verbose:
             print(f"Voronoi complete: {time.time() - t_start:.1f}s")
 
