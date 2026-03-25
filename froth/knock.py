@@ -149,14 +149,14 @@ class BubbleExtractor:
     
 @dataclass
 class BubbleMergeConfig:
-    peel_iteration: int = 10
+    peel_iteration: int = 5
     threshold: float = 0.2
     max_group_size: int = 1_000_000
     min_component_size: int = 5
     component_iteration_size_factor: int = 0
     enforce_terminal_bijection: bool = False
-    single_connect: int = 3
-    connect: int = 4
+    single_connect: int = 1
+    connect: int = 2
     chunk_size: int = 1_000_000
     n_jobs: int = -1
 
@@ -625,8 +625,8 @@ class InnerBubbleGroups:
             
 @dataclass
 class BubbleShellConfig:
-    inner_connect: int = 2
-    connect: int = 3
+    inner_connect: int = 1
+    connect: int = 2
     max_layer: int = 6
     max_iter: int = 3
     pair_order: Literal['density', 'density_temperature'] = 'density'
