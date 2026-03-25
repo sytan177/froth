@@ -8,7 +8,7 @@ architecture:
   hidden_layers: 64
   out_channels: 2
   dropout: 0.2
-  heads: 8
+  heads: 4
   
 input_features:
   - column density
