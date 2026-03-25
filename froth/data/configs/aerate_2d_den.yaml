@@ -8,7 +8,7 @@ architecture:
   hidden_layers: 64
   out_channels: 2
   dropout: 0.2
-  heads: 4
+  heads: 2
   
 input_features:
   - column density
@@ -18,7 +18,7 @@ training:
     lr: 0.001
     
   loss:
-    label_smoothing: 0.05
+    label_smoothing: 0.1
 
   epochs: 100
   batch_size: 1 
