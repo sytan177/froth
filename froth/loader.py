@@ -1,6 +1,6 @@
 import h5py, time, os, sys
 import numpy as np
-from typing import Optional
+from typing import Optional, Union, List, Tuple
 from .utils import load_masked_snapshot, build_adj, setup_logging
 
 from .file_manager import PathsConfig, FileManager
@@ -13,6 +13,7 @@ class SnapData:
     def __init__(self, snap_num: int, config_file: Optional[str] = None, 
                  data: Optional[dict] = None,
                  load_options: Optional[dict] = None,
+                 neighbor_pairs: Union[np.ndarray, List[Tuple[int, int]], None] = None,
                  voronoi_distance_threshold: float = 0.03,
                  voronoi_overlap_padding: float = 0.005, 
                  voronoi_n_jobs: int = 8,
@@ -36,6 +37,11 @@ class SnapData:
               - 'mass'        : (N,)   array, units: 1 Msun
               - 'id'          : (N,)   array, int
             If provided, skips automatic snapshot loading
+        neighbor_pairs : array-like of shape (n_neighbors, 2), optional
+            Pre-computed neighboring structure as pairs of indices into the input data.
+            Each row contains indices [i, j] of neighboring elements.
+            If None, neighbors are computed from Voronoi tessellation.
+            Default: None
         load_options : dict, optional
             Options for loading Arepo snapshots (ignored if `data` is provided):
             - snap_path (str): Path to snapshot file
@@ -95,12 +101,25 @@ class SnapData:
         self._pos_R = None
         self._num_particles = None
         self._node_degrees = None
-        
+                    
         self._vor_files = self._file_config.vor_file(self.snap_num)
+        
+        self.no_vor_file = neighbor_pairs is not None
+        
+        if neighbor_pairs is not None:
+            self._vor = np.array(neighbor_pairs).astype(np.int32)
+        else:
+            if not self._file_config._validate_vor_files(self._vor_files) or self.rebuild_voronoi :
+                logger.info("Voronoi files missing or rebuild requested.")
+                logger.info("░░░░░░░░░░░░░░ computing Voronoi... ░░░░░░░░░░░░░░")
+                self.compute_voronoi()
+                self._vor_files = self._file_config.vor_file(self.snap_num)
+            self._vor = None
+            
         self._adj = None
         self._confidence = None
         self._labels = None
-        self._vor = None
+        #self._vor = None
 
     @property
     def snap_data(self):
@@ -113,10 +132,7 @@ class SnapData:
     
     @property
     def vor_files(self):
-        if not self._file_config._validate_vor_files(self._vor_files) or self.rebuild_voronoi:
-            logger.info("Voronoi files missing or rebuild requested.")
-            logger.info("░░░░░░░░░░░░░░ computing Voronoi... ░░░░░░░░░░░░░░")
-            self.compute_voronoi()
+        if not self._file_config._validate_vor_files(self._vor_files):
             self._vor_files = self._file_config.vor_file(self.snap_num)
         return self._vor_files
     
@@ -188,7 +204,8 @@ class SnapData:
     
     def compute_voronoi(self):
         from .voronoi import BuildVoronoi
-        vor_builder = BuildVoronoi(self, verbose = self.verbose, n_jobs = self.n_jobs)
+        vor_builder = BuildVoronoi(self, verbose = self.verbose, n_jobs = self.n_jobs, padding = self.padding, 
+                                   replace = self.rebuild_voronoi)
         vor_builder.voronoi()
     
     @property
@@ -225,9 +242,9 @@ class SnapData:
             logger.info(f'   ✔   Voronoi ridges loaded in {np.round(time.time() - t0)}s.')
         return self._vor
     
-    def _set_inner_bubble(self, confidence):
+    def _set_inner_bubble(self, confidence, threshold):
         self._confidence = confidence
-        self._labels = confidence > 0.5
+        self._labels = confidence > threshold
             
     @property
     def confidence(self):
@@ -236,27 +253,37 @@ class SnapData:
     @property
     def labels(self):
         return self._labels
-    
-    
+
 class ImageData:
-    def __init__(self, path: str, region = None, verbose: bool = True):
+    def __init__(self, data: np.ndarray, verbose: bool = True):
         setup_logging(verbose)
-        if region is not None and not isinstance(region, (tuple, slice)):
-            raise TypeError("   ⚠   Region must be a numpy slice, e.g. np.s_[1120:1450, 620:950]")
         
-        from astropy.io import fits
-        if region is not None:
-            self.raw = fits.getdata(path)[region]
-        else:
-            self.raw = fits.getdata(path)
-        self.data = self.raw.copy()
-            
+        self.raw = data.copy()
+        self.data = data.copy()
+        self._data_filtered = None
+        
         self._valid_pixels = None
         self._neighbors = None
         self._neighbors_all = None
         self._adj = None
         self._node_degrees = None
         self._num_pixels = None
+        self._sigmas = None
+        self._n_sigmas = 1
+    
+    @classmethod
+    def from_file(cls, path: str, region=None, verbose: bool = True):
+        if region is not None and not isinstance(region, (tuple, slice)):
+            raise TypeError("   ⚠   Region must be a numpy slice, e.g. np.s_[1120:1450, 620:950]")
+        from astropy.io import fits
+        data = fits.getdata(path)[region] if region is not None else fits.getdata(path)
+        return cls(data, verbose=verbose)
+
+    @classmethod
+    def from_array(cls, data: np.ndarray, verbose: bool = True):
+        if not isinstance(data, np.ndarray):
+            raise TypeError("   ⚠   Image data must be a numpy array")
+        return cls(data, verbose=verbose)
         
     @property
     def valid_pixels(self):
