@@ -1,12 +1,12 @@
 base_config: aerate_base.yaml
 
 model_class: GCN_inner_image
-checkpoint: froth_aerate_2d_den_v.2.0.pth
+checkpoint: froth_aerate_2d_den_bfv_v.1.0.pth
  
 architecture:
   in_channels: 1   
-  hidden_layers: 64
-  out_channels: 2
+  hidden_layers: 32
+  out_channels: 1
   dropout: 0.2
   heads: 2
   
@@ -18,9 +18,9 @@ training:
     lr: 0.001
     
   loss:
-    label_smoothing: 0.1
+    label_smoothing: 0.
 
-  epochs: 100
+  epochs: 300
   batch_size: 1 
 
 metadata:
