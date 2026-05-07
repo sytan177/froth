@@ -350,8 +350,10 @@ class ImageData:
     def adj(self):
         if self._adj is None:
             logger.info("-----> building adjacency matrix... ")
-            self._adj = build_adj(self.neighbors, size = self.num_pixels)
+            #self._adj = build_adj(self.neighbors, size = self.num_pixels)
+            self._adj = build_adj(self.neighbors_all, size = self.num_pixels)
             logger.info("   ✔   adjacency matrix built.")
         return self._adj
+    
     
     
