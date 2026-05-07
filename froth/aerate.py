@@ -122,21 +122,38 @@ class ProcessingSnapshot():
         node_features = torch.tensor(phy_cons_chunk.T, dtype=torch.float32)
         graph_data = Data(x=node_features, edge_index=edge_index)
         return graph_data, mask
+    
+    @staticmethod
+    def prepare(phy_cons, ridge_points):        
+        edge_index = torch.tensor(ridge_points, dtype=torch.long)
+        edge_index = to_undirected(edge_index.t().contiguous())
+        node_features = torch.tensor(phy_cons.T, dtype=torch.float32)
+        graph_data = Data(x=node_features, edge_index=edge_index)
+        return graph_data
+        
         
 class ProcessingImage():
     def __init__(self, i_ImageData, image_config):
         self.image = i_ImageData
         self.config = image_config
+        if self.config.detection_mode not in ["max", "composed"]:
+            raise ValueError(f"   ⚠   detection_mode must be 'composed' or 'max', got '{self.config.detection_mode}'")
+        self.mode = self.config.detection_mode
         
+    def _validate(self):
+        if np.isnan(self.config.background_fill):
+            raise ValueError("   ⚠   background_fill must be specified to replace empty image margins")        
     def process(self):
         self.image.data = self.image.raw.copy()
-        if self.config.rotate:
+        self._validate()
+        if self.config.align:
             self._align()
-        self._smooth_and_normalize()
-    
+        if self.config.filter_sizes is not None:
+            self._smooth_and_normalize()
+                
     def _align(self):
         from sklearn.decomposition import PCA
-        self.image.data[np.isnan(self.image.data)] = 0
+        self.image.data[np.isnan(self.image.data) | np.isinf(self.image.data) | (self.image.data < 0)] = 0
         valid_mask = binary_fill_holes(self.image.data != 0).astype(int)
         coords = np.argwhere(valid_mask > 0)
         pca = PCA(n_components=2).fit(coords)
@@ -148,52 +165,73 @@ class ProcessingImage():
         rmin, rmax = np.where(rows)[0][[0, -1]]
         cmin, cmax = np.where(cols)[0][[0, -1]]
         self.image.data = rotated[rmin:rmax+1, cmin:cmax+1]
-        
+    
+    @staticmethod
+    def multiscale_gaussian_normalized(image, sigmas):
+        result = np.zeros_like(image, dtype=float)
+        for sigma in sigmas:
+            result += image / (gaussian_filter(image, sigma=sigma) + 1e-10)
+        return result / len(sigmas)
+    
+    @staticmethod
+    def gaussian_normalized(image, sigmas):
+        results = []
+        for sigma in sigmas:
+            smoothed = image / (gaussian_filter(image, sigma=sigma) + 1e-10)
+            results.append(smoothed)
+        return  results
+    
     def _smooth_and_normalize(self):
-        logger.info(f"-----> prep-rocessing image ...")
-        from photutils.background import Background2D, MedianBackground
-        from astropy.stats import sigma_clipped_stats, SigmaClip
-        if self.config.background:
-            smoothed = gaussian_filter(self.image.data, sigma = self.config.smoothing_window)
-            _, median, _ = sigma_clipped_stats(self.image.data, sigma = self.config.stats_sigma, maxiters = 5)
-            use_mask = smoothed > median
-            labeled, num_features = label(use_mask)
-            sizes = np.bincount(labeled.ravel())[1:]
-            largest_mask = labeled == (np.argmax(sizes) + 1)
-            background_mask = ~binary_fill_holes(largest_mask)
-            
-            self.image.data[background_mask] = median_filter(self.image.data, size = self.config.median_window)[background_mask]
-
-        bkg = Background2D(self.image.data, 
-                           box_size = self.config.smoothing_window, 
-                           filter_size = 3, 
-                           sigma_clip = SigmaClip(sigma = self.config.stats_sigma),
-                           mask = np.isnan(self.image.data),
-                           bkg_estimator = MedianBackground())
-        median = np.clip(bkg.background, self.config.background_val, None)
+        logger.info(f"-----> pre-processing image ...")        
+        self.image.data[np.isnan(self.image.data) | np.isinf(self.image.data) | (self.image.data < 0)] = 0
+        '''bg_global = gaussian_filter(self.image.data, sigma = self.config.background_box)
+        mask_invalid_all = (self.image.data <= 0)
+        mask_invalid = binary_opening(mask_invalid_all, iterations = self.config.opening_iteration)
+        mask_invalid_inside = mask_invalid_all ^ mask_invalid
+        mask_outliers = binary_opening(self.image.data > bg_global, iterations = 1)
+        mask_outliers = mask_outliers ^ (self.image.data > bg_global)
+        self.image.data[mask_invalid_inside| mask_outliers] = bg_global[mask_invalid_inside|mask_outliers]
+        self.image.data[mask_invalid] = self.config.background_fill
         
-        mask_invalid = (self.image.data <= 0) | np.isnan(self.image.data)
-        mask_invalid = binary_opening(mask_invalid, iterations = self.config.opening_iteration)
-
-        mask_outliers = binary_opening(self.image.data > median, iterations = 1)
-        mask_outliers = mask_outliers ^ (self.image.data > median)
+        bg_global = gaussian_filter(self.image.data, sigma = self.config.background_box)
+        self.image.data = self.image.data / bg_global
         
-        self.image.data = self.image.data / median
-        self.image.data[mask_invalid | mask_outliers] = self.config.background_val
+        if self.config.local_box is not None:        
+            bg_local = gaussian_filter(self.image.data, sigma = self.config.local_box)
+            self.image.data = self.image.data / bg_local'''
+        
+        if not isinstance(self.config.filter_sizes, list) or not all(isinstance(s, int) for s in self.config.filter_sizes):
+            logger.error(f"   ⚠   filter_sizes must be a list of integers, got {self.config.filter_sizes}")
+            raise TypeError(f"filter_sizes must be a list of integers")
+        if self.mode == 'max':
+            self.image._data_filtered = ProcessingImage.gaussian_normalized(self.image.data, self.config.filter_sizes)
+            self.image._n_sigmas = len(self.config.filter_sizes)
+        if self.mode == 'composed':
+            self.image.data = ProcessingImage.multiscale_gaussian_normalized(self.image.data, self.config.filter_sizes)
         logger.info(f"   ✔   preprocessing done.")
     
     def prepare(self):
         iy, ix = self.image.valid_pixels
-        intensities = self.image.data[iy, ix] 
-        scaler = RobustScaler()
-        features = scaler.fit_transform(np.log(intensities).reshape(-1, 1))
         edge_index = torch.tensor(self.image.neighbors.T, dtype=torch.long)
         edge_index = to_undirected(edge_index)
-        node_features = torch.tensor(features, dtype=torch.float32)        
-        return Data(x=node_features, edge_index=edge_index)
+        graph_data = []
+        if self.image._data_filtered is not None:
+            for ind in range(self.image._n_sigmas):
+                intensities = self.image._data_filtered[ind][iy, ix]
+                scaler = RobustScaler()
+                features = scaler.fit_transform(np.log(intensities).reshape(-1, 1))
+                node_features = torch.tensor(features, dtype=torch.float32)     
+                graph_data.append(Data(x=node_features, edge_index=edge_index))
+        else:
+            intensities = self.image.data[iy, ix] 
+            scaler = RobustScaler()
+            features = scaler.fit_transform(np.log(intensities).reshape(-1, 1))
+            node_features = torch.tensor(features, dtype=torch.float32)    
+            graph_data.append(Data(x=node_features, edge_index=edge_index))
+        return graph_data
         
 class BubbleClassifier:
-    def __init__(self, model_name: str,
+    def __init__(self, model_name: str, 
                  processing_config: Optional[Union[SnapConfig, ImageConfig]] = None,
                  device: Optional[str] = None, verbose: bool = True):
         """
@@ -215,14 +253,16 @@ class BubbleClassifier:
                 - force_recompute (bool, default=False): Recompute even if results exist
 
             **ImageConfig** (for 2D observational images):
-                - rotate (bool): Align image to minimize blank regions
-                - background (bool): Subtract background
-                - background_val (float, default=1.0): Background value
-                - smoothing_window (int, default=30): Smoothing kernel size
-                - median_window (int, default=20): Median filter size
-                - stats_sigma (int, default=5): Sigma for clipping statistics
+                - align (bool): Align image to minimize blank regions
+                - background_fill (float, default=1.0): Background value for image margins
+                - stretch (callable, optional): Non-linear stretch function applied to the image (e.g. np.arcsinh); 
+                  set to None for linear scale
+                - background_box (int, default=30): Box size for global background, set to None to skip global background normalisation
+                - filter_size (int, default=3): Median filter size for smoothing the background grid
+                - local_box (int, default=20): Box size for local background, set to None to skip global background normalisation
+                - opening_iteration (int, default=10): Number of morphological opening iterations for cleaning invalid pixel masks
+                - small_hole_size (int, default=1800): Minimum hole size to retain in the valid pixel mask
                 - verbose (bool, default=True): Show logging info
-                (Additional parameters to be documented)
 
         device : str, optional
             PyTorch device ('cuda' or 'cpu'). Auto-detected if not specified.
@@ -234,6 +274,7 @@ class BubbleClassifier:
         self.config = ModelConfig(model_name=model_name,
                                   device=self.device,
                                   processing_config=processing_config)
+        self.detection_threshold = processing_config.detection_threshold
         self.required_features = self.config.get_required_features()
         self._model = None
         
@@ -266,13 +307,21 @@ class BubbleClassifier:
             batch = batch.to(self.device)
             with torch.no_grad():
                 output = self.model(batch)
-                probs = torch.softmax(output, dim=1)
-            all_probs[batch.n_id[:batch.batch_size]] = probs[:batch.batch_size, 0].cpu().numpy()
+                probs = torch.sigmoid(output)
+            all_probs[batch.n_id[:batch.batch_size]] = probs[:batch.batch_size].cpu().numpy().squeeze()
         return all_probs
+    
+    def predict_image(self, graph_data):
+        prob_list = []
+        for data_i in graph_data:
+            probs = self.predict_batch(data_i)
+            prob_list.append(probs)
+        return np.max(np.stack(prob_list), axis=0)
     
     @staticmethod
     def save_results(gas_ids, gas_cfd, save_pt, snap_num, model_name):
-        logger.info('●  ●  ● aerated ●  ●  ● \n-----> saving the bubbles ... ')
+        logger.info('●  ●  ● aerated ●  ●  ●')
+        logger.info('-----> saving the bubbles ... ')
         with h5py.File(save_pt, 'w') as f:
             f.create_dataset('gas_ids', data=gas_ids, dtype='u4', 
                              compression='gzip', compression_opts = 4, chunks=True)
@@ -280,7 +329,7 @@ class BubbleClassifier:
                              compression='gzip', compression_opts = 4, chunks=True)
             f.attrs['snapshot'] = snap_num
             f.attrs['model_name'] = model_name
-        logger.info(f'   ✔    saved to {save_pt}')
+        logger.info(f'   ✔   saved to {save_pt}')
     
     def aerate_snapshot(self, i_SnapData, save_results):
         save_pt = i_SnapData._file_config.bubble_file(i_SnapData.snap_num, self.config.model_name)
@@ -290,25 +339,33 @@ class BubbleClassifier:
                         f" with model '{self.config.model_name}' already exist at:\n  {save_pt}\n skipping computation ...")
             with h5py.File(save_pt, 'r') as f:
                 confidence = f['confidence'][()]
-            i_SnapData._set_inner_bubble(confidence)
+            i_SnapData._set_inner_bubble(confidence, self.detection_threshold)
             return 
+        
         preparator = ProcessingSnapshot(i_SnapData, self.config.processing_config)
         phy_cons = preparator.prepare_features(self.required_features)        
-        voronoi_files = i_SnapData.vor_files
-        n_jobs = self.config.processing_config.n_jobs
-        logger.info(f"◦ ○ ◎ ◉ ● aerating: {len(voronoi_files)} Voronoi chunks with {n_jobs} parallel jobs ... ● ◉ ◎ ○ ◦")
-        def process_chunk(vor_file):
-            graph_data, mask = ProcessingSnapshot.prepare_chunk(i_SnapData.id, phy_cons, vor_file)
-            probs = self.predict(graph_data)
-            return probs, mask
+        confidence = np.zeros(i_SnapData.num_particles)
+
+        if not i_SnapData.no_vor_file:
+            voronoi_files = i_SnapData.vor_files
+            n_jobs = self.config.processing_config.n_jobs
+            logger.info(f"◦ ○ ◎ aerating: {len(voronoi_files)} Voronoi chunks with {n_jobs} parallel jobs ... ◎ ○ ◦")
+            
+            def process_chunk(vor_file):
+                graph_data, mask = ProcessingSnapshot.prepare_chunk(i_SnapData.id, phy_cons, vor_file)
+                probs = self.predict(graph_data)
+                return probs, mask
         
-        # Batch classify bubbles for each Voronoi chunk
-        results = Parallel(n_jobs=n_jobs, prefer="threads", verbose=10)(delayed(process_chunk)(vf) for vf in voronoi_files)
-        
-        confidence = np.zeros(len(i_SnapData.id))
-        for probs, mask in results:
-            confidence[mask] = probs
-        i_SnapData._set_inner_bubble(confidence)
+            # Batch classify bubbles for each Voronoi chunk
+            results = Parallel(n_jobs=n_jobs, prefer="threads", verbose=10)(delayed(process_chunk)(vf) for vf in voronoi_files)
+            for probs, mask in results:
+                confidence[mask] = probs
+        else:
+            logger.info(f"◦ ○ ◎ aerating ◎ ○ ◦")
+            graph_data = ProcessingSnapshot.prepare(phy_cons, i_SnapData.vor)
+            confidence = self.predict(graph_data)
+            
+        i_SnapData._set_inner_bubble(confidence, self.detection_threshold)
         if save_results:
             BubbleClassifier.save_results(i_SnapData.id, confidence, save_pt, i_SnapData.snap_num, self.config.model_name)
         return
@@ -318,13 +375,14 @@ class BubbleClassifier:
         preparator.process()
         if preprocess_only:
             return
-        logger.info(f"◦ ○ ◎ ◉ ● aerating with a batch size of {self.config.processing_config.batch_size} ... ● ◉ ◎ ○ ◦")
+        logger.info(f"◦ ○ ◎ aerating with a batch size of {self.config.processing_config.batch_size} ... ◎ ○ ◦")
+        
         graph_data = preparator.prepare()
-        probs = self.predict_batch(graph_data)
+        probs = self.predict_image(graph_data)
         inner_prob_map = np.zeros(image_data.data.shape, dtype = float)
         iy, ix = image_data.valid_pixels
         inner_prob_map[iy, ix] = probs
-        inner_map = inner_prob_map > 0.5
+        inner_map = inner_prob_map > self.detection_threshold
         inner_map = remove_small_holes(inner_map, area_threshold = self.config.processing_config.small_hole_size)
         image_data.inner = inner_map
         image_data.labels = inner_map.flatten()
