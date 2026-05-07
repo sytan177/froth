@@ -17,7 +17,7 @@ import logging
 logger = logging.getLogger(__name__)    
 
 class BubbleExtractor:
-    def __init__(self, data, 
+    def __init__(self, data,
                  force_recompute: bool = False, 
                  skip_shell: bool = False, 
                  boundary_mask = None,
@@ -43,8 +43,8 @@ class BubbleExtractor:
             - peel_iteration (int): K-core decomposition iterations (default: 10)
             - threshold (float): Overlap fraction for merging groups (default: 0.2)
             - max_group_size (int): Max cells per group for merging (default: 1e6)
-            - min_component_size (int) : Minimum component size
-            - component_iteration_size_factor : int, default=0 (default: 5)
+            - min_component_size (int) : Minimum component size (default: 5)
+            - component_iteration_size_factor : int, default=0 
               Minimum component size increases with iterations: size_limit = min_component_size + factor * iteration.
               Set > 0 to progressively filter out small components during peeling.
             - single_connect (int): Min neighbors required when all neighbors belong to the same group
@@ -53,8 +53,8 @@ class BubbleExtractor:
             - n_jobs (int): Number of parallel jobs, -1 for all cores (default: -1)
         shell_params : dict, optional
             Shell assignment parameters:
-            - inner_connect (int): Min inner neighbors to assign (default: 2)
-            - connect (int): Min shell neighbors to assign (default: 3)
+            - inner_connect (int): Min inner neighbors to assign (default: 1)
+            - connect (int): Min shell neighbors to assign (default: 2)
             - max_layer (int): Layers to expand for shells (default: 6)
             - max_iter (int): Max assignment iterations (default: 3)
             - pair_order (str): 'density' or 'density_temperature' for SnapData only (default: 'density')
@@ -146,7 +146,6 @@ class BubbleExtractor:
             self._data.bubble_groups = self._data.inner_assigned
         self._data.bubble_groups = self._data.bubble_groups.reshape(self._data.data.shape)
         
-    
 @dataclass
 class BubbleMergeConfig:
     peel_iteration: int = 5
@@ -156,7 +155,7 @@ class BubbleMergeConfig:
     component_iteration_size_factor: int = 0
     enforce_terminal_bijection: bool = False
     single_connect: int = 1
-    connect: int = 2
+    connect: int = 1
     chunk_size: int = 1_000_000
     n_jobs: int = -1
 
@@ -253,8 +252,6 @@ class InnerBubbleGroups:
     def get_image_component_lineage(self):
         t0 = time.time()
         from scipy.ndimage import label, binary_erosion, generate_binary_structure
-        structure = generate_binary_structure(2, 2)  
-        structure_test = generate_binary_structure(2, 1) 
         
         working_image = self._data.inner
         n_iter = self.config.peel_iteration
@@ -262,7 +259,7 @@ class InnerBubbleGroups:
         size_factor = self.config.component_iteration_size_factor
         
         label_structure = generate_binary_structure(2, 1)  
-        erosion_structure = generate_binary_structure(2, 2)  
+        erosion_structure = generate_binary_structure(2, 1)
         
         pixel_id = np.arange(working_image.size).reshape(working_image.shape)
         
@@ -299,7 +296,7 @@ class InnerBubbleGroups:
                                      if vid in voxel_to_prev)
                     for pid in parent_ids:
                         lineage.setdefault((iter_idx - 1, pid), []).append((iter_idx, cid))
-            eroded = binary_erosion(working_image, structure=structure, border_value = 1, iterations = 1)
+            eroded = binary_erosion(working_image, structure=erosion_structure, border_value = 1, iterations = 1)
             removed_voxels = working_image & (~eroded)
             erosion_iter[removed_voxels] = iter_idx + 1
             working_image = eroded
