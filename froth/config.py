@@ -1,7 +1,8 @@
 import torch
 from dataclasses import dataclass, field
-from typing import Union, Optional, Dict, Any
+from typing import Union, Optional, Dict, List, Any, Callable, Literal
 from .registry import ModelRegistry
+import numpy as np
 
 @dataclass
 class SnapConfig:
@@ -9,18 +10,18 @@ class SnapConfig:
     z_bin_size: float = 0.05
     R_bin_size: float = 2.0
     save_scaler: bool = False
+    detection_threshold: float = 0.5
     n_jobs: int = 6
     keep_cache: bool = False
     force_recompute: bool = False
     
 @dataclass
 class ImageConfig:
-    rotate: bool = False
-    background: bool = False
-    background_val: float = 1.0
-    smoothing_window: int = 30
-    median_window: int = 20
-    stats_sigma: int = 5
+    align: bool = False
+    background_fill: float = 1
+    detection_threshold: float = 0.5
+    detection_mode: Literal["max", "composed"] = "composed"
+    filter_sizes: List[int] = field(default_factory=lambda: [10, 20, 40])
     opening_iteration: int = 10
     save_scaler: bool = False
     small_hole_size: int = 1800
