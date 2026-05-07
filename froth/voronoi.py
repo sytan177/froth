@@ -9,7 +9,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 class BuildVoronoi:
-    def __init__(self, i_SnapData, verbose=True, n_jobs = 8):
+    def __init__(self, i_SnapData, verbose=True, n_jobs = 8, padding = 0.005, replace = False):
         self.verbose = verbose
         setup_logging(self.verbose)
         self.snap = i_SnapData
@@ -17,7 +17,9 @@ class BuildVoronoi:
         self.id = self.snap.id
         self.phi = self.snap.pos_phi
         self.vor_path = self.snap._file_config.paths.vor_path
-        self.n_jobs = self._configure_parallel(n_jobs, i_SnapData.num_particles)
+        self.padding = padding
+        self.replace = replace
+        self.n_jobs = self._configure_parallel(n_jobs, self.snap.num_particles)
         
         self.num_of_chunks = max(1, 2 ** int(np.round(np.log2(self.snap.num_particles / 5_000_000))))
         self.phi_mod = (self.phi + np.pi) % (2 * np.pi)
@@ -53,18 +55,18 @@ class BuildVoronoi:
         
         return n_jobs
         
-    def get_tasks(self, pad=0.005):
+    def get_tasks(self):
         tasks = []
         two_pi = 2 * np.pi
         for i in range(self.num_of_chunks):
             phi_start, phi_end = self.phi_ranges[i:i+2]            
             mask_use = (self.phi_mod >= phi_start) & (self.phi_mod < phi_end)
-            mask_phi = (self.phi_mod >= phi_start - pad) & (self.phi_mod < phi_end + pad)
+            mask_phi = (self.phi_mod >= phi_start - self.padding) & (self.phi_mod < phi_end + self.padding)
             
-            if phi_start - pad < 0:
-                mask_phi |= self.phi_mod >= (two_pi + phi_start - pad)
-            if phi_end + pad > two_pi:
-                mask_phi |= self.phi_mod < (phi_end + pad - two_pi)
+            if phi_start - self.padding < 0:
+                mask_phi |= self.phi_mod >= (two_pi + phi_start - self.padding)
+            if phi_end + self.padding > two_pi:
+                mask_phi |= self.phi_mod < (phi_end + self.padding - two_pi)
             tasks.append([self.id[mask_use], self.id[mask_phi], self.pos[mask_phi]])        
         return tasks
     
@@ -87,7 +89,7 @@ class BuildVoronoi:
     
     @staticmethod
     def process_one(i, gas_ids_to_use, gas_ids_filtered, gas_pos_filtered, file_phi_ranges, snap_num, 
-                    vor_save_path, replace = False):
+                    vor_save_path, replace):
         phi_start_i = file_phi_ranges[i]
         phi_end_i = file_phi_ranges[i+1]
         vor_save_name = f"{snap_num}_{i}_{np.round(phi_start_i / np.pi, 2)}_{np.round(phi_end_i / np.pi, 2)}_sec_vor.npz"
@@ -104,14 +106,15 @@ class BuildVoronoi:
     
     def voronoi(self):
         if self.verbose:
-            
-            print(f'Building Voronoi diagram: {self.num_of_chunks} chunks, ' f'{len(self.id):,} particles')
+            logger.info(f' ∘-∘ ∘ building Voronoi diagram: {self.num_of_chunks} chunks, ' f'{len(self.id):,} particles ∘-∘ ∘ ')
+            #print(f'Building Voronoi diagram: {self.num_of_chunks} chunks, ' f'{len(self.id):,} particles')
         t_start = time.time()
         gas_tasks = self.get_tasks()
         Parallel(n_jobs = self.n_jobs)(delayed(BuildVoronoi.process_one)(i, *gas_tasks[i], self.file_phi_ranges, self.snap.snap_num, 
-                                                  self.vor_path) for i in range(len(gas_tasks)))
+                                                  self.vor_path, self.replace) for i in range(len(gas_tasks)))
         if self.verbose:
-            print(f"Voronoi complete: {time.time() - t_start:.1f}s")
+            logger.info(f" ∘-∘-∘ Voronoi complete: {time.time() - t_start:.1f}s ∘-∘-∘ ")
+            #print(f"Voronoi complete: {time.time() - t_start:.1f}s")
 
 
 
