@@ -62,7 +62,7 @@ def load_masked_snapshot(snap_path, temperature = False, time = False, z_limit =
     gas_vol_all = gas_mass_all / gas_den_all
     
     R = gas_pos_all[:, 0]**2 + gas_pos_all[:, 1]**2
-    mask = (R > R_min**2 - pad) & ((R < R_max**2 + pad)) & (np.abs(gas_pos_all[:, 2]) <= z_limit  + pad)
+    mask = (R > R_min**2 - pad) & (R < R_max**2 + pad) & (np.abs(gas_pos_all[:, 2]) < z_limit  + pad)
 
     gas_pos = gas_pos_all[mask].compute()
     gas_den = (gas_den_all[mask].compute() * UnitDensity_in_gpercm3)
