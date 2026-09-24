@@ -561,7 +561,7 @@ class InnerBubbleGroups:
         num_valid = num_valid + num_boundary
         if num_valid / num_neighbors >= threshold or group_num in invalid_groups:
             counts = np.zeros(np.max(touching_groups) + 1, np.int64)
-            for v in touching_groups:
+            for v in valid_touching:
                 counts[v] += 1
             group_to_merge = np.argmax(counts)
             return group_to_merge
